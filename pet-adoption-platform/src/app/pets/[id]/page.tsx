@@ -14,26 +14,28 @@ export default async function PetDetailPage({ params }: PageProps) {
     const supabase = await createClient();
 
     // Fetch pet with images
-    const { data: pet, error } = await supabase
+    const { data: pet, error: petError } = await supabase
         .from('pets')
         .select(`
       *,
-      pet_images (*),
-      users_profile!pets_publisher_id_fkey (
-        id,
-        username,
-        full_name,
-        avatar_url
-      )
+      pet_images (*)
     `)
         .eq('id', id)
         .single();
 
-    if (error || !pet) {
+    if (petError || !pet) {
+        console.error('Error fetching pet:', petError);
         notFound();
     }
 
-    const publisher = pet.users_profile as { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+    // Fetch publisher profile separately
+    const { data: publisherProfile } = await supabase
+        .from('users_profile')
+        .select('id, username, full_name, avatar_url')
+        .eq('id', pet.publisher_id)
+        .single();
+
+    const publisher = publisherProfile || { id: pet.publisher_id, username: '未知用户', full_name: '未知用户', avatar_url: null };
     const images = (pet.pet_images || []).sort((a: { display_order: number }, b: { display_order: number }) => a.display_order - b.display_order);
 
     const speciesEmoji: Record<string, string> = {
